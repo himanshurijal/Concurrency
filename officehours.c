@@ -42,6 +42,7 @@
 /* TODO */
 /* Add your synchronization variables here */
 sem_t office; // Mutex to guard the critical section
+sem_t enter; // Mutex to guard the critical section while students check whether or not they should enter the office
 
 /* Basic information about simulation.  They are printed/checked at the end
  * and in assert statements during execution.
@@ -53,8 +54,12 @@ sem_t office; // Mutex to guard the critical section
 static int students_in_office;   /* Total numbers of students currently in the office */
 static int classa_inoffice;      /* Total numbers of students from class A currently in the office */
 static int classb_inoffice;      /* Total numbers of students from class B in the office */
-static int students_since_break = 0;
+static int students_since_break;
 
+static int classa_students;      /* Total number of students in class A that have entered the office */
+static int classb_students;      /* Total number of students in class B that have entered the office */
+static int classa_consecutive;
+static int classb_consecutive;
 
 typedef struct
 {
@@ -75,11 +80,18 @@ static int initialize(student_info *si, char *filename)
   classb_inoffice = 0;
   students_since_break = 0;
 
+  classa_students = 0;
+  classb_students = 0;
+  classa_consecutive = 0;
+  classb_consecutive = 0;
+
   /* Initialize your synchronization variables (and
    * other variables you might use) here
    */
 
   sem_init(&office, 0, MAX_SEATS);  /* initialize office to Max number of seats alloted + 1 for professor */
+                                    /* second param = 0 - semaphore is local */
+  sem_init(&enter, 0, 1);  /* initialize office to Max number of seats alloted + 1 for professor */
                                     /* second param = 0 - semaphore is local */
 
   /* Read in the data file and initialize the student array */
@@ -131,8 +143,13 @@ void *professorthread(void *junk)
     /* students are admitted without regard of the number         */
     /* of available seats, which class a student is in,           */
     /* and whether the professor needs a break. You need to add   */
-    /* all of this.                                               */
+    /* all of this.      
+                                             */
 
+    if(students_since_break == 10 && students_in_office == 0)
+    {
+      take_break();
+    }
   }
   pthread_exit(NULL);
 }
@@ -150,16 +167,40 @@ void classa_enter()
   /* synchronization for the simulations variables below                  */
   /*  YOUR CODE HERE.                                                     */
 
-  while(classb_inoffice != 0){
-  // Wait if students from class B are in office
+  classa_students += 1;
+
+  if(classa_consecutive == 5 && classb_students == 0)
+  {
+    classa_consecutive = 0;
   }
-    
+
+  while(1)
+  {
+    //Up semaphore
+    sem_wait(&enter);
+
+    if(classb_inoffice != 0 || students_since_break == 10 || (classa_consecutive == 5 && classb_students > 0))
+    {
+      // Wait if students from class B are in office or number of students served since break is 10 
+      // Down sempahore
+      sem_post(&enter);
+    }
+    else
+    {
+      break;
+    }
+  }
+
   // Down semaphore
   sem_wait(&office);
 
   students_in_office += 1;
   students_since_break += 1;
   classa_inoffice += 1;
+  classa_consecutive += 1;
+
+  // Down semaphore
+  sem_post(&enter);
 
 }
 
@@ -174,21 +215,42 @@ void classb_enter()
   /* Request permission to enter the office.  You might also want to add  */
   /* synchronization for the simulations variables below                  */
   /*  YOUR CODE HERE.                                                     */
-    
-  while(classa_inoffice != 0){
-  // Wait if students from class A are in office
+
+  classb_students += 1;
+
+  if(classb_consecutive == 5 && classa_students == 0)
+  {
+    classa_consecutive = 0;
   }
-    
+
+  while(1)
+  {
+    //Up semaphore
+    sem_wait(&enter);
+
+    if(classa_inoffice != 0 || students_since_break == 10 || (classb_consecutive == 5 && classa_students > 0))
+    {
+      // Wait if students from class B are in office or number of students served since break is 10 
+      // Down semaphore
+      sem_post(&enter);
+    }
+    else
+    {
+      break;
+    }
+  }
+
   // Down semaphore
   sem_wait(&office);
-
 
   students_in_office += 1;
   students_since_break += 1;
   classb_inoffice += 1;
+  classb_consecutive += 1;
+
+  sem_post(&enter);
 
 }
-
 /* Code executed by a student to simulate the time he spends in the office asking questions
  * You do not need to add anything here.
  */
@@ -211,8 +273,10 @@ static void classa_leave()
     
   students_in_office -= 1;
   classa_inoffice -= 1;
-    
-  // Up semaphore
+  classa_students -= 1;
+  classb_consecutive = 0;
+
+  //Down semaphore
   sem_post(&office);
 
 }
@@ -230,6 +294,8 @@ static void classb_leave()
     
   students_in_office -= 1;
   classb_inoffice -= 1;
+  classb_students -= 1;
+  classa_consecutive = 0;
 
   // Up semaphore
   sem_post(&office);
