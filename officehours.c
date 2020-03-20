@@ -169,11 +169,6 @@ void classa_enter()
 
   classa_students += 1;
 
-  if(classa_consecutive == 5 && classb_students == 0)
-  {
-    classa_consecutive = 0;
-  }
-
   while(1)
   {
     //Up semaphore
@@ -197,7 +192,14 @@ void classa_enter()
   students_in_office += 1;
   students_since_break += 1;
   classa_inoffice += 1;
-  classa_consecutive += 1;
+  if(classa_consecutive == 5 && classb_inoffice == 0)
+  {
+    //Don't increase consecutive number of A after 5 consecutive students have entered from A with no B entering
+  }
+  else
+  {
+    classa_consecutive += 1;
+  }
 
   // Down semaphore
   sem_post(&enter);
@@ -217,11 +219,6 @@ void classb_enter()
   /*  YOUR CODE HERE.                                                     */
 
   classb_students += 1;
-
-  if(classb_consecutive == 5 && classa_students == 0)
-  {
-    classa_consecutive = 0;
-  }
 
   while(1)
   {
@@ -246,7 +243,14 @@ void classb_enter()
   students_in_office += 1;
   students_since_break += 1;
   classb_inoffice += 1;
-  classb_consecutive += 1;
+  if(classb_consecutive == 5 && classa_inoffice == 0)
+  {
+    //Don't increase consecutive number of B after 5 consecutive students have entered from B with no A entering
+  }
+  else
+  {
+    classb_consecutive += 1; 
+  }
 
   sem_post(&enter);
 
