@@ -1,4 +1,4 @@
-// Copyright (c) 2020 Trevor Bakker
+// Copyright (c) 2020 Trevor Bakker, Copyright (c) 2020 Himanshu Rijal
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -11,7 +11,7 @@
 // copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-/// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
@@ -29,9 +29,10 @@
 
 /*** Constants that define parameters of the simulation ***/
 
-#define MAX_SEATS 3        /* Number of seats in the professor's office */
-#define professor_LIMIT 10 /* Number of students the professor can help before he needs a break */
-#define MAX_STUDENTS 1000  /* Maximum number of students in the simulation */
+#define MAX_SEATS 3          /* Number of seats in the professor's office */
+#define professor_LIMIT 10   /* Number of students the professor can help before he needs a break */
+#define MAX_STUDENTS 1000  	 /* Maximum number of students in the simulation */
+#define consecutive_LIMIT 5  /* Maximum number of consecutive students from a class allowed to enter the office */
 
 #define CLASSA 0
 #define CLASSB 1
@@ -41,35 +42,37 @@
 
 /* TODO */
 /* Add your synchronization variables here */
-sem_t office; // Mutex to guard the critical section
-sem_t enter; // Mutex to guard the critical section while students check whether or not they should enter the office
 
-/* Basic information about simulation.  They are printed/checked at the end
+sem_t office; /* Mutex to guard the critical section */
+sem_t enter; /* Mutex to guard the critical section while students check whether or not they should enter the office */
+
+
+/* Basic information about simulation.  They are printed/checked at the end 
  * and in assert statements during execution.
  *
- * You are responsible for maintaining the integrity of these variables in the
- * code that you develop.
+ * You are responsible for maintaining the integrity of these variables in the 
+ * code that you develop. 
  */
 
-static int students_in_office;   /* Total numbers of students currently in the office */
-static int classa_inoffice;      /* Total numbers of students from class A currently in the office */
-static int classb_inoffice;      /* Total numbers of students from class B in the office */
-static int students_since_break;
+static int students_in_office;   /* Total number of students currently in the office */
+static int classa_inoffice;      /* Total number of students from class A currently in the office */
+static int classb_inoffice;      /* Total number of students from class B in the office */
+static int students_since_break; /* Total number of students since the last break */
 
-static int classa_students;      /* Total number of students in class A that have entered the office */
-static int classb_students;      /* Total number of students in class B that have entered the office */
-static int classa_consecutive;
-static int classb_consecutive;
+static int classa_students;      /* Total number of students from class A that have arrived */
+static int classb_students;      /* Total number of students from class B that have arrived */
+static int classa_consecutive;   /* Consecutive number of students from class A that have entered the office */
+static int classb_consecutive;   /* Consecutive number of students from class B that have entered the office */
 
 typedef struct
 {
-  int arrival_time;  // time between the arrival of this student and the previous student
-  int question_time; // time the student needs to spend with the professor
+  int arrival_time;  /* time between the arrival of this student and the previous student */
+  int question_time; /* time the student needs to spend with the professor */
   int student_id;
   int class;
 } student_info;
 
-/* Called at beginning of simulation.
+/* Called at beginning of simulation.  
  * TODO: Create/initialize all synchronization
  * variables and other global variables that you add.
  */
@@ -78,21 +81,20 @@ static int initialize(student_info *si, char *filename)
   students_in_office = 0;
   classa_inoffice = 0;
   classb_inoffice = 0;
-  students_since_break = 0;
+  students_since_break = 0; 
+
+  /* Initialize your synchronization variables (and 
+   * other variables you might use) here
+   */
 
   classa_students = 0;
   classb_students = 0;
   classa_consecutive = 0;
   classb_consecutive = 0;
 
-  /* Initialize your synchronization variables (and
-   * other variables you might use) here
-   */
-
-  sem_init(&office, 0, MAX_SEATS);  /* initialize office to Max number of seats alloted + 1 for professor */
-                                    /* second param = 0 - semaphore is local */
-  sem_init(&enter, 0, 1);  /* initialize office to Max number of seats alloted + 1 for professor */
-                                    /* second param = 0 - semaphore is local */
+  sem_init(&office, 0, MAX_SEATS);  /* Initialize office to MAX_SEATS alloted + 1 for the professor */
+                                    /* Second param = 0 - semaphore is local */
+  sem_init(&enter, 0, 1);  			/* Initialize enter to one student (Only one student can check for eligibility to enter the office at a time) */
 
   /* Read in the data file and initialize the student array */
   FILE *fp;
@@ -114,8 +116,7 @@ static int initialize(student_info *si, char *filename)
  return i;
 }
 
-/* Code executed by professor to simulate taking a break
- * You do not need to add anything here.
+/* Code executed by professor to simulate taking a break.
  */
 static void take_break()
 {
@@ -126,25 +127,18 @@ static void take_break()
 }
 
 /* Code for the professor thread. This is fully implemented except for synchronization
- * with the students.  See the comments within the function for details.
+ * with the students.
  */
 void *professorthread(void *junk)
 {
   printf("The professor arrived and is starting his office hours\n");
 
-  /* Loop while waiting for students to arrive. */
+  /* Loop waiting for students to arrive. */
   while (1)
   {
 
-    /* TODO */
-    /* Add code here to handle the student's request.             */
-    /* Currently the body of the loop is empty. There's           */
-    /* no communication between professor and students, i.e. all  */
-    /* students are admitted without regard of the number         */
-    /* of available seats, which class a student is in,           */
-    /* and whether the professor needs a break. You need to add   */
-    /* all of this.      
-                                             */
+  	/* TODO */
+    /* Add code here to handle the student's request. */
 
     if(students_since_break == 10 && students_in_office == 0)
     {
@@ -156,28 +150,30 @@ void *professorthread(void *junk)
 
 
 /* Code executed by a class A student to enter the office.
- * You have to implement this.  Do not delete the assert() statements,
- * but feel free to add your own.
+ * You have to implement this.
  */
 void classa_enter()
 {
 
   /* TODO */
-  /* Request permission to enter the office.  You might also want to add  */
-  /* synchronization for the simulations variables below                  */
-  /*  YOUR CODE HERE.                                                     */
+  /* Request permission to enter the office. You might also want to add  */
+  /* synchronization for the simulation variables below                  */
+  /* YOUR CODE HERE.                                                     */
 
   classa_students += 1;
 
   while(1)
   {
-    //Up semaphore
+    /* Up semaphore */
     sem_wait(&enter);
 
-    if(classb_inoffice != 0 || students_since_break == 10 || (classa_consecutive == 5 && classb_students > 0))
+    if(classb_inoffice != 0 || students_since_break == professor_LIMIT || (classa_consecutive == consecutive_LIMIT && classb_students > 0))
     {
-      // Wait if students from class B are in office or number of students served since break is 10 
-      // Down sempahore
+      /* Wait if students from class B are in office or number of students served since break is equal     */
+      /* to professsor_LIMIT or 5 (consecutive_LIMIT) consecutive students from class A have entered       */
+      /* office while students from B are waiting.														   */ 
+
+      /* Down sempahore */
       sem_post(&enter);
     }
     else
@@ -186,29 +182,30 @@ void classa_enter()
     }
   }
 
-  // Down semaphore
   sem_wait(&office);
 
   students_in_office += 1;
   students_since_break += 1;
   classa_inoffice += 1;
-  if(classa_consecutive == 5 && classb_inoffice == 0)
+
+  if(classa_consecutive == consecutive_LIMIT && classb_inoffice == 0)
   {
-    //Don't increase consecutive number of A after 5 consecutive students have entered from A with no B entering
+    /* Until a student from class B arrives and enters the office the consecutive        */
+    /* number of students from class A that have entered the office will not             */
+    /* increase or be reset once it reaches consecutive_LIMIT even if more students      */
+    /* from class A enter the office.  													 */
   }
   else
   {
     classa_consecutive += 1;
   }
 
-  // Down semaphore
   sem_post(&enter);
 
 }
 
 /* Code executed by a class B student to enter the office.
- * You have to implement this.  Do not delete the assert() statements,
- * but feel free to add your own.
+ * You have to implement this.
  */
 void classb_enter()
 {
@@ -216,19 +213,18 @@ void classb_enter()
   /* TODO */
   /* Request permission to enter the office.  You might also want to add  */
   /* synchronization for the simulations variables below                  */
-  /*  YOUR CODE HERE.                                                     */
+  /* YOUR CODE HERE.                                                      */
 
   classb_students += 1;
 
+  /* Students from class B will follow similar logic to enter the office as students from class A */
   while(1)
   {
-    //Up semaphore
+
     sem_wait(&enter);
 
-    if(classa_inoffice != 0 || students_since_break == 10 || (classb_consecutive == 5 && classa_students > 0))
+    if(classa_inoffice != 0 || students_since_break == professor_LIMIT || (classb_consecutive == consecutive_LIMIT && classa_students > 0))
     {
-      // Wait if students from class B are in office or number of students served since break is 10 
-      // Down semaphore
       sem_post(&enter);
     }
     else
@@ -237,15 +233,15 @@ void classb_enter()
     }
   }
 
-  // Down semaphore
   sem_wait(&office);
 
   students_in_office += 1;
   students_since_break += 1;
   classb_inoffice += 1;
+
   if(classb_consecutive == 5 && classa_inoffice == 0)
   {
-    //Don't increase consecutive number of B after 5 consecutive students have entered from B with no A entering
+
   }
   else
   {
@@ -255,8 +251,8 @@ void classb_enter()
   sem_post(&enter);
 
 }
+
 /* Code executed by a student to simulate the time he spends in the office asking questions
- * You do not need to add anything here.
  */
 static void ask_questions(int t)
 {
@@ -265,8 +261,7 @@ static void ask_questions(int t)
 
 
 /* Code executed by a class A student when leaving the office.
- * You need to implement this.  Do not delete the assert() statements,
- * but feel free to add as many of your own as you like.
+ * You need to implement this.
  */
 static void classa_leave()
 {
@@ -278,16 +273,15 @@ static void classa_leave()
   students_in_office -= 1;
   classa_inoffice -= 1;
   classa_students -= 1;
-  classb_consecutive = 0;
+  classb_consecutive = 0; /* Once a student from class A has entered and left the office */
+  						  /* reset the consecutive count of students from class B        */
 
-  //Down semaphore
   sem_post(&office);
 
 }
 
 /* Code executed by a class B student when leaving the office.
- * You need to implement this.  Do not delete the assert() statements,
- * but feel free to add as many of your own as you like.
+ * You need to implement this.
  */
 static void classb_leave()
 {
@@ -299,15 +293,13 @@ static void classb_leave()
   students_in_office -= 1;
   classb_inoffice -= 1;
   classb_students -= 1;
-  classa_consecutive = 0;
+  classa_consecutive = 0; /* Once a student from class B has entered and left the office */
+  						  /* reset the consecutive count of students from class A        */
 
-  // Up semaphore
   sem_post(&office);
 }
 
 /* Main code for class A student threads.
- * You do not need to change anything here, but you can add
- * debug statements to help you during development/debugging.
  */
 void* classa_student(void *si)
 {
@@ -450,6 +442,7 @@ int main(int nargs, char **args)
     
     /* destroy semaphore */
     sem_destroy(&office);
+    sem_destroy(&enter);
     
   printf("Office hour simulation done.\n");
 
