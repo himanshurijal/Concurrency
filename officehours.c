@@ -40,11 +40,8 @@
 #define CLASSD 3
 #define CLASSE 4
 
-/* TODO */
-/* Add your synchronization variables here */
-
 sem_t office; /* Mutex to guard the critical section */
-sem_t enter; /* Mutex to guard the critical section while students check whether or not they should enter the office */
+sem_t enter;  /* Mutex to guard the critical section while students check whether or not they should enter the office */
 
 
 /* Basic information about simulation.  They are printed/checked at the end 
@@ -73,8 +70,6 @@ typedef struct
 } student_info;
 
 /* Called at beginning of simulation.  
- * TODO: Create/initialize all synchronization
- * variables and other global variables that you add.
  */
 static int initialize(student_info *si, char *filename)
 {
@@ -83,10 +78,6 @@ static int initialize(student_info *si, char *filename)
   classb_inoffice = 0;
   students_since_break = 0; 
 
-  /* Initialize your synchronization variables (and 
-   * other variables you might use) here
-   */
-
   classa_students = 0;
   classb_students = 0;
   classa_consecutive = 0;
@@ -94,7 +85,7 @@ static int initialize(student_info *si, char *filename)
 
   sem_init(&office, 0, MAX_SEATS);  /* Initialize office to MAX_SEATS alloted + 1 for the professor */
                                     /* Second param = 0 - semaphore is local */
-  sem_init(&enter, 0, 1);  			/* Initialize enter to one student (Only one student can check for eligibility to enter the office at a time) */
+  sem_init(&enter, 0, 1);  		    	/* Initialize enter to one student (Only one student can check for eligibility to enter the office at a time) */
 
   /* Read in the data file and initialize the student array */
   FILE *fp;
@@ -126,8 +117,7 @@ static void take_break()
   students_since_break = 0;
 }
 
-/* Code for the professor thread. This is fully implemented except for synchronization
- * with the students.
+/* Code for the professor thread.
  */
 void *professorthread(void *junk)
 {
@@ -136,10 +126,6 @@ void *professorthread(void *junk)
   /* Loop waiting for students to arrive. */
   while (1)
   {
-
-  	/* TODO */
-    /* Add code here to handle the student's request. */
-
     if(students_since_break == 10 && students_in_office == 0)
     {
       take_break();
@@ -150,30 +136,21 @@ void *professorthread(void *junk)
 
 
 /* Code executed by a class A student to enter the office.
- * You have to implement this.
  */
 void classa_enter()
 {
-
-  /* TODO */
-  /* Request permission to enter the office. You might also want to add  */
-  /* synchronization for the simulation variables below                  */
-  /* YOUR CODE HERE.                                                     */
-
   classa_students += 1;
 
   while(1)
   {
-    /* Up semaphore */
     sem_wait(&enter);
 
     if(classb_inoffice != 0 || students_since_break == professor_LIMIT || (classa_consecutive == consecutive_LIMIT && classb_students > 0))
     {
       /* Wait if students from class B are in office or number of students served since break is equal     */
       /* to professsor_LIMIT or 5 (consecutive_LIMIT) consecutive students from class A have entered       */
-      /* office while students from B are waiting.														   */ 
+      /* office while students from B are waiting.														                             */ 
 
-      /* Down sempahore */
       sem_post(&enter);
     }
     else
@@ -193,7 +170,7 @@ void classa_enter()
     /* Until a student from class B arrives and enters the office the consecutive        */
     /* number of students from class A that have entered the office will not             */
     /* increase or be reset once it reaches consecutive_LIMIT even if more students      */
-    /* from class A enter the office.  													 */
+    /* from class A enter the office.  													                         */
   }
   else
   {
@@ -205,16 +182,9 @@ void classa_enter()
 }
 
 /* Code executed by a class B student to enter the office.
- * You have to implement this.
  */
 void classb_enter()
 {
-
-  /* TODO */
-  /* Request permission to enter the office.  You might also want to add  */
-  /* synchronization for the simulations variables below                  */
-  /* YOUR CODE HERE.                                                      */
-
   classb_students += 1;
 
   /* Students from class B will follow similar logic to enter the office as students from class A */
@@ -241,7 +211,6 @@ void classb_enter()
 
   if(classb_consecutive == 5 && classa_inoffice == 0)
   {
-
   }
   else
   {
@@ -261,40 +230,28 @@ static void ask_questions(int t)
 
 
 /* Code executed by a class A student when leaving the office.
- * You need to implement this.
  */
 static void classa_leave()
 {
-  /*
-   *  TODO
-   *  YOUR CODE HERE.
-   */
-    
   students_in_office -= 1;
   classa_inoffice -= 1;
   classa_students -= 1;
   classb_consecutive = 0; /* Once a student from class A has entered and left the office */
-  						  /* reset the consecutive count of students from class B        */
+  						            /* reset the consecutive count of students from class B        */
 
   sem_post(&office);
 
 }
 
 /* Code executed by a class B student when leaving the office.
- * You need to implement this.
  */
 static void classb_leave()
 {
-  /*
-   * TODO
-   * YOUR CODE HERE.
-   */
-    
   students_in_office -= 1;
   classb_inoffice -= 1;
   classb_students -= 1;
   classa_consecutive = 0; /* Once a student from class B has entered and left the office */
-  						  /* reset the consecutive count of students from class A        */
+  						            /* reset the consecutive count of students from class A        */
 
   sem_post(&office);
 }
@@ -315,7 +272,7 @@ void* classa_student(void *si)
   assert(classb_inoffice >= 0 && classb_inoffice <= MAX_SEATS);
   assert(classb_inoffice == 0 );
   
-  /* ask questions  --- do not make changes to the 3 lines below*/
+  /* ask questions */
   printf("Student %d from class A starts asking questions for %d minutes\n", s_info->student_id, s_info->question_time);
   ask_questions(s_info->question_time);
   printf("Student %d from class A finishes asking questions and prepares to leave\n", s_info->student_id);
@@ -333,8 +290,6 @@ void* classa_student(void *si)
 }
 
 /* Main code for class B student threads.
- * You do not need to change anything here, but you can add
- * debug statements to help you during development/debugging.
  */
 void* classb_student(void *si)
 {
